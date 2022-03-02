@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func main() {
+func main2() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	// config 测试 每十秒获取一次config
