@@ -78,6 +78,28 @@ func registerSelf(port int, wg sync.WaitGroup) {
 	http.ListenAndServe(":"+strconv.Itoa(port), nil)
 }
 
+var serverConfigs = []constant.ServerConfig{
+	{
+		IpAddr:      "127.0.0.1",
+		ContextPath: "/nacos",
+		Port:        8849,
+		Scheme:      "http",
+	},
+	{
+		IpAddr:      "127.0.0.1",
+		ContextPath: "/nacos",
+		Port:        8848,
+		Scheme:      "http",
+	},
+	{
+		IpAddr:      "127.0.0.1",
+		ContextPath: "/nacos",
+		Port:        8847,
+		Scheme:      "http",
+	},
+}
+var nowCount = 0
+
 func getNamingClient() (naming_client.INamingClient, error) {
 	var clientConfig = *constant.NewClientConfig(
 		//constant.WithNamespaceId("501689b2-129f-450c-8735-b04a5978b016"), //当namespace是public时，此处填空字符串。
@@ -89,14 +111,9 @@ func getNamingClient() (naming_client.INamingClient, error) {
 		constant.WithUsername("nacos"),
 		constant.WithPassword("nacos"),
 	)
-	var serverConfigs = []constant.ServerConfig{
-		{
-			IpAddr:      "127.0.0.1",
-			ContextPath: "/nacos",
-			Port:        8848,
-			Scheme:      "http",
-		},
-	}
+	sc := []constant.ServerConfig{}
+	sc = append(sc, serverConfigs[nowCount%3])
+	nowCount++
 	return clients.NewNamingClient(
 		vo.NacosClientParam{
 			ClientConfig:  &clientConfig,
