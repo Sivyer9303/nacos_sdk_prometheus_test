@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/nacos-group/nacos-sdk-go/clients"
 	"github.com/nacos-group/nacos-sdk-go/clients/naming_client"
 	"github.com/nacos-group/nacos-sdk-go/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/vo"
 	"github.com/prometheus/common/log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"sync"
@@ -47,11 +49,14 @@ func main() {
 		select {
 		case <-tick:
 			// 每三十秒注册一个
-			go registerSelf(portStart+i, wg)
+			rand.Seed(time.Now().Unix())
+			go registerSelf(portStart+rand.Intn(1000), wg)
 		}
 	}
 	wg.Wait()
 }
+
+var ip = createRandomIp()
 
 func registerSelf(port int, wg sync.WaitGroup) {
 	log.Info("start register self")
@@ -63,7 +68,7 @@ func registerSelf(port int, wg sync.WaitGroup) {
 	}
 	// 先注册自己
 	_, err := namingClient.RegisterInstance(vo.RegisterInstanceParam{
-		Ip:          "localhost",
+		Ip:          ip,
 		Port:        uint64(port),
 		Weight:      1,
 		Enable:      true,
@@ -120,4 +125,11 @@ func getNamingClient() (naming_client.INamingClient, error) {
 			ServerConfigs: serverConfigs,
 		},
 	)
+}
+
+// create random ip addr
+func createRandomIp() string {
+	rand.Seed(time.Now().Unix())
+	ip := fmt.Sprintf("%d.%d.%d.%d", rand.Intn(255), rand.Intn(255), rand.Intn(255), rand.Intn(255))
+	return ip
 }
