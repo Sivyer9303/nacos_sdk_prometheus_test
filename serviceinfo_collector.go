@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/nacos-group/nacos-sdk-go/clients"
-	"github.com/nacos-group/nacos-sdk-go/clients/naming_client"
-	"github.com/nacos-group/nacos-sdk-go/common/constant"
-	"github.com/nacos-group/nacos-sdk-go/vo"
+	"github.com/nacos-group/nacos-sdk-go/v2/clients"
+	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
+	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
+	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"github.com/prometheus/common/log"
 	"math/rand"
 	"net/http"
@@ -15,44 +15,77 @@ import (
 )
 
 func main() {
-	// 启动同名服务
+	//// 启动同名服务
+	//var wg sync.WaitGroup
+	//tick := time.Tick(time.Second * 15)
+	//portStart := 7788
+	//// 启动一个线程，一直获取service list
+	//go func() {
+	//	tick := time.Tick(time.Second * 5)
+	//	client, err := getNamingClient()
+	//	if err != nil {
+	//		log.Fatal("err ... ", err)
+	//	}
+	//	for {
+	//		select {
+	//		case <-tick:
+	//			_, err := client.GetService(vo.GetServiceParam{
+	//				ServiceName: "prometheuse_service",
+	//				GroupName:   "DEFAULT_GROUP",
+	//			})
+	//			if err != nil {
+	//				log.Fatal("get service fail ...", err)
+	//			}
+	//			//bytes, err := json.Marshal(service)
+	//			//if err != nil {
+	//			//	log.Fatal("Marshal service fail ...",err)
+	//			//}
+	//			//fmt.Println(string(bytes))
+	//		}
+	//	}
+	//}()
+	//for i := 0; i < 1; i++ {
+	//	wg.Add(1)
+	//	select {
+	//	case <-tick:
+	//		// 每三十秒注册一个
+	//		rand.Seed(time.Now().Unix())
+	//		go registerSelf(portStart+rand.Intn(1000), wg)
+	//	}
+	//}
+	//wg.Wait()
+
+	// 注册一个服务，然后看文件名，然后再注册一个服务
 	var wg sync.WaitGroup
-	tick := time.Tick(time.Second * 15)
-	portStart := 7788
-	// 启动一个线程，一直获取service list
-	go func() {
-		tick := time.Tick(time.Second * 5)
-		client, err := getNamingClient()
-		if err != nil {
-			log.Fatal("err ... ", err)
-		}
-		for {
-			select {
-			case <-tick:
-				_, err := client.GetService(vo.GetServiceParam{
-					ServiceName: "prometheuse_service",
-					GroupName:   "DEFAULT_GROUP",
-				})
-				if err != nil {
-					log.Fatal("get service fail ...", err)
-				}
-				//bytes, err := json.Marshal(service)
-				//if err != nil {
-				//	log.Fatal("Marshal service fail ...",err)
-				//}
-				//fmt.Println(string(bytes))
-			}
-		}
-	}()
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		select {
-		case <-tick:
-			// 每三十秒注册一个
-			rand.Seed(time.Now().Unix())
-			go registerSelf(portStart+rand.Intn(1000), wg)
-		}
+	wg.Add(1)
+	client, err := getNamingClient()
+	if err != nil {
+		return
 	}
+	go func() {
+		http.ListenAndServe(":4567", nil)
+		wg.Done()
+	}()
+	// 先注册自己
+	_, err1 := client.RegisterInstance(vo.RegisterInstanceParam{
+		Ip:          ip,
+		Port:        uint64(4567),
+		GroupName:   "MALL_GROUP",
+		Weight:      1,
+		Enable:      true,
+		Ephemeral:   true,
+		Healthy:     true,
+		ServiceName: "prometheuse_service",
+		ClusterName: "ps",
+	})
+	if err1 != nil {
+		log.Fatal("register fail")
+	}
+	// 获取服务
+	client.GetService(vo.GetServiceParam{
+		ServiceName: "prometheuse_service",
+		GroupName:   "MALL_GROUP",
+	})
 	wg.Wait()
 }
 
@@ -70,6 +103,7 @@ func registerSelf(port int, wg sync.WaitGroup) {
 	_, err := namingClient.RegisterInstance(vo.RegisterInstanceParam{
 		Ip:          ip,
 		Port:        uint64(port),
+		GroupName:   "DEFAULT_GROUP",
 		Weight:      1,
 		Enable:      true,
 		Ephemeral:   true,
@@ -84,24 +118,24 @@ func registerSelf(port int, wg sync.WaitGroup) {
 }
 
 var serverConfigs = []constant.ServerConfig{
-	{
-		IpAddr:      "127.0.0.1",
-		ContextPath: "/nacos",
-		Port:        8849,
-		Scheme:      "http",
-	},
+	//{
+	//	IpAddr:      "127.0.0.1",
+	//	ContextPath: "/nacos",
+	//	Port:        8849,
+	//	Scheme:      "http",
+	//},
 	{
 		IpAddr:      "127.0.0.1",
 		ContextPath: "/nacos",
 		Port:        8848,
 		Scheme:      "http",
 	},
-	{
-		IpAddr:      "127.0.0.1",
-		ContextPath: "/nacos",
-		Port:        8847,
-		Scheme:      "http",
-	},
+	//{
+	//	IpAddr:      "127.0.0.1",
+	//	ContextPath: "/nacos",
+	//	Port:        8847,
+	//	Scheme:      "http",
+	//},
 }
 var nowCount = 0
 
@@ -111,13 +145,14 @@ func getNamingClient() (naming_client.INamingClient, error) {
 		constant.WithTimeoutMs(5000),
 		constant.WithNotLoadCacheAtStart(true),
 		constant.WithLogDir("/tmp/nacos/log"),
-		constant.WithCacheDir("/tmp/nacos/cache"),
+		//constant.WithCacheDir("/tmp/nacos/cache"),
 		constant.WithLogLevel("debug"),
 		constant.WithUsername("nacos"),
 		constant.WithPassword("nacos"),
+		constant.WithNotLoadCacheAtStart(false),
 	)
 	sc := []constant.ServerConfig{}
-	sc = append(sc, serverConfigs[nowCount%3])
+	sc = append(sc, serverConfigs...)
 	nowCount++
 	return clients.NewNamingClient(
 		vo.NacosClientParam{
