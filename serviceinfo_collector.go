@@ -5,6 +5,7 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/clients"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
+	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"github.com/prometheus/common/log"
 	"math/rand"
@@ -56,6 +57,7 @@ func main() {
 	//wg.Wait()
 
 	// 注册一个服务，然后看文件名，然后再注册一个服务
+	serviceName, groupName, clusterName := "prometheuse_service", "MALL_GROUP", "ps"
 	var wg sync.WaitGroup
 	wg.Add(1)
 	client, err := getNamingClient()
@@ -70,13 +72,13 @@ func main() {
 	_, err1 := client.RegisterInstance(vo.RegisterInstanceParam{
 		Ip:          ip,
 		Port:        uint64(4567),
-		GroupName:   "MALL_GROUP",
+		GroupName:   groupName,
 		Weight:      1,
 		Enable:      true,
 		Ephemeral:   true,
 		Healthy:     true,
-		ServiceName: "prometheuse_service",
-		ClusterName: "ps",
+		ServiceName: serviceName,
+		ClusterName: clusterName,
 	})
 	if err1 != nil {
 		log.Fatal("register fail")
@@ -86,10 +88,51 @@ func main() {
 		ServiceName: "prometheuse_service",
 		GroupName:   "MALL_GROUP",
 	})
+	f := func(services []model.Instance, err error) {
+		fmt.Println("开始执行callback .....")
+		fmt.Println(services)
+		fmt.Println("执行callback结束......")
+	}
+	client.Subscribe(&vo.SubscribeParam{
+		ServiceName:       serviceName,
+		Clusters:          []string{clusterName},
+		GroupName:         groupName,
+		SubscribeCallback: f,
+	})
+	// 再注册一个服务，触发callback
+	_, err2 := client.RegisterInstance(vo.RegisterInstanceParam{
+		Ip:          ip,
+		Port:        uint64(4568),
+		GroupName:   groupName,
+		Weight:      1,
+		Enable:      true,
+		Ephemeral:   true,
+		Healthy:     true,
+		ServiceName: serviceName,
+		ClusterName: clusterName,
+	})
+	if err2 != nil {
+		log.Fatal("register 2 fail")
+	}
+
+	_, err3 := client.RegisterInstance(vo.RegisterInstanceParam{
+		Ip:          ip,
+		Port:        uint64(4569),
+		GroupName:   groupName,
+		Weight:      1,
+		Enable:      true,
+		Ephemeral:   true,
+		Healthy:     true,
+		ServiceName: serviceName,
+		ClusterName: clusterName,
+	})
+	if err3 != nil {
+		log.Fatal("register 2 fail")
+	}
 	wg.Wait()
 }
 
-var ip = createRandomIp()
+var ip = "127.0.0.1"
 
 func registerSelf(port int, wg sync.WaitGroup) {
 	log.Info("start register self")
